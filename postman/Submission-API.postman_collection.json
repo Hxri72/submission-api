@@ -1,0 +1,205 @@
+{
+  "info": {
+    "name": "Submission API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "form_id", "value": "contact-form" },
+    { "key": "idempotency_key", "value": "" },
+    { "key": "submission_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Create submission (201)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.collectionVariables.set(\"idempotency_key\", \"pm-\" + Date.now());"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status is 201\", () => pm.response.to.have.status(201));",
+              "pm.collectionVariables.set(\"submission_id\", pm.response.json().submission._id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/submissions",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"form_id\": \"{{form_id}}\",\n  \"idempotency_key\": \"{{idempotency_key}}\",\n  \"email\": \"user@example.com\",\n  \"data\": { \"name\": \"John\", \"message\": \"Hello\" }\n}"
+        }
+      }
+    },
+    {
+      "name": "2. Same key again - duplicate (200)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Returns the same record\", () => {",
+              "    pm.expect(pm.response.json().submission._id).to.eql(pm.collectionVariables.get(\"submission_id\"));",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/submissions",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"form_id\": \"{{form_id}}\",\n  \"idempotency_key\": \"{{idempotency_key}}\",\n  \"email\": \"user@example.com\",\n  \"data\": { \"name\": \"John\", \"message\": \"Hello\" }\n}"
+        }
+      }
+    },
+    {
+      "name": "3. Missing form_id (400)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));",
+              "pm.test(\"Message\", () => pm.expect(pm.response.json().message).to.eql(\"form_id is required\"));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/submissions",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"idempotency_key\": \"k1\",\n  \"email\": \"user@example.com\"\n}"
+        }
+      }
+    },
+    {
+      "name": "4. Invalid email (400)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));",
+              "pm.test(\"Message\", () => pm.expect(pm.response.json().message).to.eql(\"Invalid email\"));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/submissions",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"form_id\": \"contact-form\",\n  \"idempotency_key\": \"k1\",\n  \"email\": \"not-an-email\"\n}"
+        }
+      }
+    },
+    {
+      "name": "5. Missing idempotency_key (400)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));",
+              "pm.test(\"Message\", () => pm.expect(pm.response.json().message).to.eql(\"idempotency_key is required\"));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/submissions",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"form_id\": \"contact-form\",\n  \"email\": \"user@example.com\"\n}"
+        }
+      }
+    },
+    {
+      "name": "6. Invalid JSON (400)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/submissions",
+        "body": {
+          "mode": "raw",
+          "raw": "{ bad json"
+        }
+      }
+    },
+    {
+      "name": "7. List submissions - page 1",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"At most 10 per page\", () => pm.expect(pm.response.json().submissions.length).to.be.at.most(10));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/forms/{{form_id}}/submissions?page=1"
+      }
+    },
+    {
+      "name": "8. Hourly stats (Flink)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/forms/{{form_id}}/stats"
+      }
+    }
+  ]
+}

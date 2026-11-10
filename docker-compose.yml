@@ -1,0 +1,51 @@
+x-flink-config: &flink-config
+  FLINK_PROPERTIES: |
+    jobmanager.rpc.address: jobmanager
+    jobmanager.memory.process.size: 1024m
+    taskmanager.memory.process.size: 1280m
+    execution.checkpointing.interval: 10s
+    execution.checkpointing.externalized-checkpoint-retention: RETAIN_ON_CANCELLATION
+    state.checkpoints.dir: file:///flink-checkpoints
+    restart-strategy.type: fixed-delay
+    restart-strategy.fixed-delay.attempts: 100
+    restart-strategy.fixed-delay.delay: 5s
+    table.local-time-zone: UTC
+
+services:
+  mongo:
+    image: mongo:7.0
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "try { rs.status().ok } catch (e) { rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'mongo:27017' }] }).ok }"]
+      interval: 5s
+      retries: 20
+
+  jobmanager:
+    build: ./flink
+    command: jobmanager
+    ports:
+      - "8081:8081"
+    environment: *flink-config
+    volumes:
+      - ./flink:/opt/flink/jobs
+      - flink-checkpoints:/flink-checkpoints
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  taskmanager:
+    build: ./flink
+    command: taskmanager
+    environment: *flink-config
+    volumes:
+      - flink-checkpoints:/flink-checkpoints
+    depends_on:
+      - jobmanager
+
+volumes:
+  mongo-data:
+  flink-checkpoints:
